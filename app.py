@@ -1,86 +1,92 @@
-import customtkinter as ctk
-import os
+import tkinter as tk
+from tkinter import messagebox, ttk
 from engine import gerar_pdf_etiquetas, DESTINOS
+import os
+import sys
 
-class AppEtiquetas(ctk.CTk):
-    def __init__(self):
-        super().__init__()
+# Cores e Configurações
+COR_PRIMARIA = "#156082"
+COR_FUNDO = "#f4f7f9"
+COR_TEXTO = "#2c3e50"
+COR_BRANCO = "#ffffff"
+COR_SUBTIL = "#95a5a6"
+ARQUIVO_CONFIG = "config_origem.txt"
 
-        self.title("Gerador de Etiquetas V1.0")
-        self.geometry("450x600")
-        self.resizable(False, False)
+def carregar_origem_padrao():
+    if os.path.exists(ARQUIVO_CONFIG):
+        with open(ARQUIVO_CONFIG, "r") as f:
+            un = f.read().strip()
+            if un in DESTINOS: return un
+    return DESTINOS[0]
 
-        # Título
-        self.label_titulo = ctk.CTkLabel(self, text="GERADOR DE ETIQUETAS", font=("Arial", 20, "bold"))
-        self.label_titulo.pack(pady=20)
+def abrir_vizualizador(caminho):
+    if sys.platform == "win32": os.startfile(caminho)
+    else: os.system(f"xdg-open {caminho}")
 
-        # --- REMETENTE (Agora com Menu) ---
-        self.label_rem = ctk.CTkLabel(self, text="Selecione o Remetente:")
-        self.label_rem.pack(pady=(10, 0))
-        self.combo_remetente = ctk.CTkComboBox(self, values=DESTINOS, width=300)
-        self.combo_remetente.pack(pady=5)
+def on_click(event):
+    if entry_vol.get() == 'QUANTIDADE DE CAIXAS':
+        entry_vol.delete(0, "end")
+        entry_vol.config(fg=COR_TEXTO)
 
-        # --- DESTINO ---
-        self.label_dest = ctk.CTkLabel(self, text="Selecione o Destino:")
-        self.label_dest.pack(pady=(10, 0))
-        self.combo_destino = ctk.CTkComboBox(self, values=DESTINOS, width=300)
-        self.combo_destino.pack(pady=5)
+def on_out(event):
+    if entry_vol.get() == '':
+        entry_vol.insert(0, 'QUANTIDADE DE CAIXAS')
+        entry_vol.config(fg=COR_SUBTIL)
 
-        # Nota Fiscal
-        self.label_nf = ctk.CTkLabel(self, text="Número da Nota Fiscal:")
-        self.label_nf.pack(pady=(10, 0))
-        self.entry_nf = ctk.CTkEntry(self, width=300, placeholder_text="Ex: 000.123")
-        self.entry_nf.pack(pady=5)
+def acao():
+    rem, dest, nf, vol_raw = var_rem.get(), var_dest.get(), entry_nf.get(), entry_vol.get()
+    if vol_raw == 'QUANTIDADE DE CAIXAS' or not vol_raw or not nf:
+        messagebox.showwarning("Aviso", "Preencha a NF e a Quantidade corretamente.")
+        return
+    try:
+        vols = int(vol_raw)
+        with open(ARQUIVO_CONFIG, "w") as f: f.write(rem)
+        gerar_pdf_etiquetas("etiquetas_saida.pdf", {'remetente': rem, 'destino': dest, 'nf': nf}, vols)
+        abrir_vizualizador("etiquetas_saida.pdf")
+    except: messagebox.showerror("Erro", "Quantidade inválida.")
 
-        # Volumes
-        self.label_vol = ctk.CTkLabel(self, text="Quantidade de Volumes:")
-        self.label_vol.pack(pady=(10, 0))
-        self.entry_vol = ctk.CTkEntry(self, width=300, placeholder_text="Ex: 5")
-        self.entry_vol.pack(pady=5)
+# --- Janela Principal ---
+root = tk.Tk()
+root.title("Expedição - Maxi/Ultra Popular")
+root.geometry("450x580")
+root.configure(bg=COR_FUNDO)
 
-        # Botão Gerar
-        self.btn_gerar = ctk.CTkButton(self, text="GERAR PDF AGORA", command=self.executar_geracao, height=45, font=("Arial", 14, "bold"))
-        self.btn_gerar.pack(pady=30)
+# Bloquear Maximizar
+root.resizable(False, False)
 
-        # Status
-        self.label_status = ctk.CTkLabel(self, text="", text_color="yellow")
-        self.label_status.pack()
+# Ícone (Remover a pena)
+if os.path.exists("logo.ico"):
+    root.iconbitmap("logo.ico")
 
-    def executar_geracao(self):
-        try:
-            # Garante que a pasta existe
-            if not os.path.exists("pdf_saida"):
-                os.makedirs("pdf_saida")
+header = tk.Frame(root, bg=COR_PRIMARIA, height=70)
+header.pack(fill='x')
+header.pack_propagate(False)
+tk.Label(header, text="GERADOR DE ETIQUETAS", bg=COR_PRIMARIA, fg=COR_BRANCO, font=("Segoe UI", 14, "bold")).pack(expand=True)
 
-            remetente = self.combo_remetente.get()
-            destino = self.combo_destino.get()
-            nf = self.entry_nf.get()
-            
-            if not self.entry_vol.get():
-                raise ValueError("Digite a quantidade de volumes")
-                
-            vols = int(self.entry_vol.get())
+main = tk.Frame(root, bg=COR_FUNDO, padx=30, pady=20)
+main.pack(fill='both', expand=True)
 
-            # Nome do arquivo: Etiquetas_DE_LojaA_PARA_LojaB.pdf
-            nome_limpo_rem = remetente.replace(' ', '_')
-            nome_limpo_dest = destino.replace(' ', '_')
-            caminho = f"pdf_saida/Etiquetas_{nome_limpo_rem}_PARA_{nome_limpo_dest}_NF_{nf}.pdf"
-            
-            dados = {
-                'remetente': remetente,
-                'destino': destino,
-                'nf': nf
-            }
-            
-            gerar_pdf_etiquetas(caminho, dados, vols)
+# Interface
+tk.Label(main, text="ORIGEM (REMETENTE):", bg=COR_FUNDO, font=("Segoe UI", 9, "bold")).pack(fill='x', pady=(10,0))
+var_rem = tk.StringVar(value=carregar_origem_padrao())
+ttk.Combobox(main, textvariable=var_rem, values=DESTINOS, state="readonly", font=("Segoe UI", 11)).pack(fill='x', pady=5)
 
-            self.label_status.configure(text=f"Sucesso! Salvo na pasta pdf_saida", text_color="green")
-            
-        except ValueError as e:
-            self.label_status.configure(text=f"Erro: {str(e)}", text_color="red")
-        except Exception as e:
-            self.label_status.configure(text=f"Erro inesperado", text_color="red")
+tk.Label(main, text="DESTINO:", bg=COR_FUNDO, font=("Segoe UI", 9, "bold")).pack(fill='x', pady=(10,0))
+var_dest = tk.StringVar(value=DESTINOS[0])
+ttk.Combobox(main, textvariable=var_dest, values=DESTINOS, state="readonly", font=("Segoe UI", 11)).pack(fill='x', pady=5)
 
-if __name__ == "__main__":
-    app = AppEtiquetas()
-    app.mainloop()
+tk.Label(main, text="NOTA FISCAL:", bg=COR_FUNDO, font=("Segoe UI", 9, "bold")).pack(fill='x', pady=(10,0))
+entry_nf = tk.Entry(main, font=("Segoe UI", 12), bd=1, relief="solid")
+entry_nf.pack(fill='x', ipady=5, pady=5)
+
+tk.Label(main, text="VOLUMES:", bg=COR_FUNDO, font=("Segoe UI", 9, "bold")).pack(fill='x', pady=(10,0))
+entry_vol = tk.Entry(main, font=("Segoe UI", 12), bd=1, relief="solid", fg=COR_SUBTIL)
+entry_vol.insert(0, 'QUANTIDADE DE CAIXAS')
+entry_vol.bind('<FocusIn>', on_click)
+entry_vol.bind('<FocusOut>', on_out)
+entry_vol.pack(fill='x', ipady=5, pady=5)
+
+tk.Button(main, text="GERAR E CONFERIR PDF", bg=COR_PRIMARIA, fg=COR_BRANCO, 
+          font=("Segoe UI", 12, "bold"), relief="flat", command=acao, height=2, cursor="hand2").pack(fill='x', pady=25)
+
+root.mainloop()
