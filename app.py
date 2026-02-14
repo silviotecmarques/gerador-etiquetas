@@ -1,92 +1,101 @@
+import ctypes
+import sys
+import os
+
+# --- RESOLUÇÃO DE CAMINHO PARA RECURSOS NO EXE ---
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+# --- FIXAR ÍCONE NA BARRA DE TAREFAS ---
+if sys.platform == "win32":
+    try:
+        # ID único para o Windows não confundir com o Python
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('Farmacia.Expedicao.Maxi.V3')
+    except: pass
+
 import tkinter as tk
 from tkinter import messagebox, ttk
 from engine import gerar_pdf_etiquetas, DESTINOS
-import os
-import sys
 
-# Cores e Configurações
-COR_PRIMARIA = "#156082"
-COR_FUNDO = "#f4f7f9"
-COR_TEXTO = "#2c3e50"
-COR_BRANCO = "#ffffff"
-COR_SUBTIL = "#95a5a6"
-ARQUIVO_CONFIG = "config_origem.txt"
+COR_P = "#156082"  # Azul Petróleo
+COR_F = "#f4f7f9"  # Fundo suave
+COR_T = "#2c3e50"
+ARQ_C = "config_origem.txt"
 
-def carregar_origem_padrao():
-    if os.path.exists(ARQUIVO_CONFIG):
-        with open(ARQUIVO_CONFIG, "r") as f:
+def carregar_origem():
+    if os.path.exists(ARQ_C):
+        with open(ARQ_C, "r") as f:
             un = f.read().strip()
             if un in DESTINOS: return un
     return DESTINOS[0]
 
-def abrir_vizualizador(caminho):
-    if sys.platform == "win32": os.startfile(caminho)
-    else: os.system(f"xdg-open {caminho}")
-
-def on_click(event):
-    if entry_vol.get() == 'QUANTIDADE DE CAIXAS':
-        entry_vol.delete(0, "end")
-        entry_vol.config(fg=COR_TEXTO)
-
-def on_out(event):
-    if entry_vol.get() == '':
-        entry_vol.insert(0, 'QUANTIDADE DE CAIXAS')
-        entry_vol.config(fg=COR_SUBTIL)
-
 def acao():
     rem, dest, nf, vol_raw = var_rem.get(), var_dest.get(), entry_nf.get(), entry_vol.get()
-    if vol_raw == 'QUANTIDADE DE CAIXAS' or not vol_raw or not nf:
-        messagebox.showwarning("Aviso", "Preencha a NF e a Quantidade corretamente.")
+    if vol_raw == 'QUANTIDADE DE CAIXAS' or not nf:
+        messagebox.showwarning("Aviso", "Por favor, preencha a NF e a Quantidade!")
         return
     try:
         vols = int(vol_raw)
-        with open(ARQUIVO_CONFIG, "w") as f: f.write(rem)
+        # Salva a origem como padrão
+        with open(ARQ_C, "w") as f: f.write(rem)
+        
         gerar_pdf_etiquetas("etiquetas_saida.pdf", {'remetente': rem, 'destino': dest, 'nf': nf}, vols)
-        abrir_vizualizador("etiquetas_saida.pdf")
-    except: messagebox.showerror("Erro", "Quantidade inválida.")
+        
+        if sys.platform == "win32": os.startfile("etiquetas_saida.pdf")
+        else: os.system(f"xdg-open etiquetas_saida.pdf")
+    except: 
+        messagebox.showerror("Erro", "Quantidade de volumes inválida.")
 
-# --- Janela Principal ---
 root = tk.Tk()
 root.title("Expedição - Maxi/Ultra Popular")
 root.geometry("450x580")
-root.configure(bg=COR_FUNDO)
+root.configure(bg=COR_F)
 
-# Bloquear Maximizar
+# Desativa Maximizar
 root.resizable(False, False)
 
-# Ícone (Remover a pena)
-if os.path.exists("logo.ico"):
-    root.iconbitmap("logo.ico")
+# Ícone do Programa
+path_ico = resource_path("logo.ico")
+if os.path.exists(path_ico): 
+    root.iconbitmap(path_ico)
 
-header = tk.Frame(root, bg=COR_PRIMARIA, height=70)
+# Cabeçalho Azul
+header = tk.Frame(root, bg=COR_P, height=70)
 header.pack(fill='x')
 header.pack_propagate(False)
-tk.Label(header, text="GERADOR DE ETIQUETAS", bg=COR_PRIMARIA, fg=COR_BRANCO, font=("Segoe UI", 14, "bold")).pack(expand=True)
+tk.Label(header, text="GERADOR DE ETIQUETAS", bg=COR_P, fg="white", font=("Segoe UI", 14, "bold")).pack(expand=True)
 
-main = tk.Frame(root, bg=COR_FUNDO, padx=30, pady=20)
+main = tk.Frame(root, bg=COR_F, padx=30, pady=20)
 main.pack(fill='both', expand=True)
 
 # Interface
-tk.Label(main, text="ORIGEM (REMETENTE):", bg=COR_FUNDO, font=("Segoe UI", 9, "bold")).pack(fill='x', pady=(10,0))
-var_rem = tk.StringVar(value=carregar_origem_padrao())
+tk.Label(main, text="ORIGEM (REMETENTE):", bg=COR_F, font=("Segoe UI", 9, "bold")).pack(fill='x', pady=(10,0))
+var_rem = tk.StringVar(value=carregar_origem())
 ttk.Combobox(main, textvariable=var_rem, values=DESTINOS, state="readonly", font=("Segoe UI", 11)).pack(fill='x', pady=5)
 
-tk.Label(main, text="DESTINO:", bg=COR_FUNDO, font=("Segoe UI", 9, "bold")).pack(fill='x', pady=(10,0))
+tk.Label(main, text="DESTINO:", bg=COR_F, font=("Segoe UI", 9, "bold")).pack(fill='x', pady=(10,0))
 var_dest = tk.StringVar(value=DESTINOS[0])
 ttk.Combobox(main, textvariable=var_dest, values=DESTINOS, state="readonly", font=("Segoe UI", 11)).pack(fill='x', pady=5)
 
-tk.Label(main, text="NOTA FISCAL:", bg=COR_FUNDO, font=("Segoe UI", 9, "bold")).pack(fill='x', pady=(10,0))
+tk.Label(main, text="NOTA FISCAL:", bg=COR_F, font=("Segoe UI", 9, "bold")).pack(fill='x', pady=(10,0))
 entry_nf = tk.Entry(main, font=("Segoe UI", 12), bd=1, relief="solid")
 entry_nf.pack(fill='x', ipady=5, pady=5)
 
-tk.Label(main, text="VOLUMES:", bg=COR_FUNDO, font=("Segoe UI", 9, "bold")).pack(fill='x', pady=(10,0))
-entry_vol = tk.Entry(main, font=("Segoe UI", 12), bd=1, relief="solid", fg=COR_SUBTIL)
+tk.Label(main, text="VOLUMES:", bg=COR_F, font=("Segoe UI", 9, "bold")).pack(fill='x', pady=(10,0))
+entry_vol = tk.Entry(main, font=("Segoe UI", 12), bd=1, relief="solid", fg="#95a5a6")
 entry_vol.insert(0, 'QUANTIDADE DE CAIXAS')
-entry_vol.bind('<FocusIn>', on_click)
-entry_vol.bind('<FocusOut>', on_out)
+
+# Placeholder Inteligente
+entry_vol.bind('<FocusIn>', lambda e: (entry_vol.delete(0, 'end'), entry_vol.config(fg=COR_T)) if entry_vol.get()=='QUANTIDADE DE CAIXAS' else None)
+entry_vol.bind('<FocusOut>', lambda e: (entry_vol.insert(0, 'QUANTIDADE DE CAIXAS'), entry_vol.config(fg="#95a5a6")) if entry_vol.get()=='' else None)
+
 entry_vol.pack(fill='x', ipady=5, pady=5)
 
-tk.Button(main, text="GERAR E CONFERIR PDF", bg=COR_PRIMARIA, fg=COR_BRANCO, 
-          font=("Segoe UI", 12, "bold"), relief="flat", command=acao, height=2, cursor="hand2").pack(fill='x', pady=25)
+tk.Button(main, text="GERAR E CONFERIR PDF", bg=COR_P, fg="white", font=("Segoe UI", 12, "bold"), 
+          relief="flat", command=acao, height=2, cursor="hand2").pack(fill='x', pady=25)
 
 root.mainloop()

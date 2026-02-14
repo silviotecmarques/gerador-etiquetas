@@ -1,10 +1,16 @@
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
-from reportlab.lib.utils import ImageReader
 from reportlab.lib.units import mm
 import os
+import sys
 
-# --- CONFIGURAÇÃO DAS LOJAS (Cores e Logos) ---
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
 CONFIG_LOJAS = {
     "ABAETETUBA 01":  {"cor": "#ff9966", "logo": "maxi.png"},
     "ABAETETUBA 02":  {"cor": "#00b050", "logo": "maxi.png"},
@@ -32,88 +38,86 @@ def hex_to_rgb(hex_code):
     return tuple(int(hex_code[i:i+2], 16)/255.0 for i in (0, 2, 4))
 
 def desenhar_etiqueta(c, x, y, largura, altura, dados):
-    cor_azul_petroleo = hex_to_rgb("#156082")
+    cor_azul = hex_to_rgb("#156082")
     cor_branco = (1, 1, 1)
     cor_preto = (0, 0, 0)
 
-    # Borda
-    c.setLineWidth(1)
+    # Borda externa
+    c.setLineWidth(1.5)
     c.setStrokeColorRGB(*cor_preto)
     c.rect(x, y, largura, altura)
     
     x_meio = x + (largura / 2)
     y_topo = y + altura
-    y_centro = y + (altura / 2)
-    y_box_dest = y_centro + 4 * mm
-    y_limite_inferior_topo = y_box_dest + 7 * mm
+    h_barra = 10 * mm 
 
-    # 1. LOGO
+    # 1. CABEÇALHO (Logo e Remetente)
+    # SUBI O RETÂNGULO: De 35mm para 28mm
+    y_div_sup = y_topo - 28 * mm
+    
     info_loja = CONFIG_LOJAS.get(dados['remetente'], {"logo": "maxi.png"}) 
-    arquivo_logo = info_loja["logo"]
-    if os.path.exists(arquivo_logo):
-        c.drawImage(arquivo_logo, x, y_limite_inferior_topo, width=largura/2, height=y_topo - y_limite_inferior_topo, preserveAspectRatio=True, anchor='c')
-    else:
-        c.rect(x, y_limite_inferior_topo, largura/2, y_topo - y_limite_inferior_topo, stroke=1)
+    img_path = resource_path(info_loja["logo"])
+    if os.path.exists(img_path):
+        c.drawImage(img_path, x + 8*mm, y_div_sup + 4*mm, width=largura/2.5, height=18*mm, preserveAspectRatio=True, anchor='c')
 
-    # 2. REMETENTE
-    c.setFillColorRGB(*cor_azul_petroleo) 
-    c.rect(x_meio, y_topo - 7*mm, largura/2, 7*mm, fill=1, stroke=1)
+    c.setFillColorRGB(*cor_azul)
+    c.rect(x_meio, y_topo - h_barra, largura/2, h_barra, fill=1)
     c.setFillColorRGB(*cor_branco)
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(x_meio + 2*mm, y_topo - 5*mm, "REMETENTE:")
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(x_meio + 5*mm, y_topo - 7.5*mm, "REMETENTE:")
     
     c.setFillColorRGB(*cor_preto)
-    c.setFont("Helvetica-Bold", 12) 
-    c.drawString(x_meio + (largura/2 - c.stringWidth(dados['remetente'], "Helvetica-Bold", 12))/2, y_limite_inferior_topo + (y_topo - 7*mm - y_limite_inferior_topo)/2 - 1.5*mm, dados['remetente'])
-
-    # 3. DESTINO
-    c.setFillColorRGB(*cor_azul_petroleo) 
-    c.rect(x, y_box_dest, largura, 7*mm, fill=1, stroke=1)
-    c.setFillColorRGB(*cor_branco)
-    c.setFont("Helvetica-Bold", 11) 
-    c.drawString(x + (largura - c.stringWidth("DESTINO:", "Helvetica-Bold", 11))/2, y_box_dest + 2*mm, "DESTINO:")
-
-    # Fundo Colorido do Destino
-    y_inf_dest = y + 20*mm
-    info_dest = CONFIG_LOJAS.get(dados['destino'], {"cor": "#ffffff"})
-    c.setFillColorRGB(*hex_to_rgb(info_dest["cor"]))
-    c.rect(x, y_inf_dest, largura, y_box_dest - y_inf_dest, fill=1, stroke=1)
-
-    c.setFillColorRGB(*cor_preto)
-    c.setFont("Helvetica-Bold", 25) 
-    c.drawString(x + (largura - c.stringWidth(dados['destino'], "Helvetica-Bold", 25))/2, y_inf_dest + (y_box_dest - y_inf_dest)/2 - 3.5*mm, dados['destino'])
-
-    # 4. RODAPÉ
-    y_footer = y_inf_dest - 7*mm
-    c.setFillColorRGB(*cor_azul_petroleo)
-    c.rect(x, y_footer, largura/2, 7*mm, fill=1, stroke=1)
-    c.rect(x_meio, y_footer, largura/2, 7*mm, fill=1, stroke=1)
-    
-    c.setFillColorRGB(*cor_branco)
-    c.setFont("Helvetica-Bold", 9)
-    c.drawString(x + 2*mm, y_footer + 2*mm, "NOTA FISCAL:")
-    c.drawString(x_meio + 2*mm, y_footer + 2*mm, "VOLUME:")
-    
-    c.setFillColorRGB(*cor_preto)
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(x + (largura/4 - c.stringWidth(dados['nf'], "Helvetica-Bold", 12)/2), y + 6*mm, dados['nf'])
     c.setFont("Helvetica-Bold", 16)
-    c.drawString(x_meio + (largura/4 - c.stringWidth(dados['vol_status'], "Helvetica-Bold", 16)/2), y + 5*mm, dados['vol_status'])
-    c.line(x_meio, y, x_meio, y_footer)
+    c.drawString(x_meio + (largura/2 - c.stringWidth(dados['remetente'], "Helvetica-Bold", 16))/2, y_div_sup + 6*mm, dados['remetente'])
+
+    # 2. BLOCO DO RODAPÉ (NF E VOLUME)
+    y_rodape_base = y + 22 * mm 
+    
+    c.setFillColorRGB(*cor_azul)
+    c.rect(x, y_rodape_base - h_barra, largura/2, h_barra, fill=1)
+    c.rect(x_meio, y_rodape_base - h_barra, largura/2, h_barra, fill=1)
+    
+    c.setFillColorRGB(*cor_branco)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(x + 5*mm, y_rodape_base - 7.5*mm, "NOTA FISCAL:")
+    c.drawString(x_meio + 5*mm, y_rodape_base - 7.5*mm, "VOLUME:")
+    
+    c.setFillColorRGB(*cor_preto)
+    c.setFont("Helvetica-Bold", 26)
+    y_texto_rodape = y + 4 * mm
+    c.drawString(x + (largura/4 - c.stringWidth(dados['nf'], "Helvetica-Bold", 26)/2), y_texto_rodape, dados['nf'])
+    c.drawString(x_meio + (largura/4 - c.stringWidth(dados['vol_status'], "Helvetica-Bold", 26)/2), y_texto_rodape, dados['vol_status'])
+
+    # 3. BLOCO CENTRAL (DESTINO) - AGORA COM MAIS ESPAÇO
+    c.setFillColorRGB(*cor_azul)
+    c.rect(x, y_div_sup - h_barra, largura, h_barra, fill=1)
+    c.setFillColorRGB(*cor_branco)
+    c.setFont("Helvetica-Bold", 15)
+    c.drawString(x + (largura - c.stringWidth("DESTINO:", "Helvetica-Bold", 15))/2, y_div_sup - 7.5*mm, "DESTINO:")
+
+    y_cor_inicio = y_rodape_base
+    h_cor = (y_div_sup - h_barra) - y_cor_inicio
+    
+    cor_loja = CONFIG_LOJAS.get(dados['destino'], {"cor": "#ffffff"})["cor"]
+    c.setFillColorRGB(*hex_to_rgb(cor_loja))
+    c.rect(x, y_cor_inicio, largura, h_cor, fill=1)
+    
+    c.setFillColorRGB(*cor_preto)
+    c.setFont("Helvetica-Bold", 48)
+    c.drawString(x + (largura - c.stringWidth(dados['destino'], "Helvetica-Bold", 48))/2, y_cor_inicio + (h_cor/2) - 6*mm, dados['destino'])
+
+    c.setLineWidth(1)
+    c.line(x_meio, y, x_meio, y_rodape_base)
 
 def gerar_pdf_etiquetas(nome_arquivo, dados_base, qtd_volumes):
     c = canvas.Canvas(nome_arquivo, pagesize=A4)
     largura_a4, altura_a4 = A4
-    m_x, m_y, esp = 10*mm, 10*mm, 15*mm
-    larg_e = (largura_a4 - 2*m_x - esp)/2
-    alt_e = (altura_a4 - 2*m_y - 2*esp)/3
-    
+    m_x, m_y, esp = 35*mm, 15*mm, 10*mm
+    l_eti = largura_a4 - (2 * m_x)
+    a_eti = (altura_a4 - (2 * m_y) - (2 * esp)) / 3
     for i in range(1, qtd_volumes + 1):
-        idx = (i - 1) % 6
+        idx = (i-1) % 3
         if i > 1 and idx == 0: c.showPage()
-        col, lin = idx % 2, idx // 2
-        px = m_x + (col * (larg_e + esp))
-        py = (altura_a4 - m_y) - ((lin + 1) * alt_e) - (lin * esp)
-        dados = {**dados_base, 'vol_status': f"{i} / {qtd_volumes}"}
-        desenhar_etiqueta(c, px, py, larg_e, alt_e, dados)
+        py = (altura_a4 - m_y) - ((idx + 1) * a_eti) - (idx * esp)
+        desenhar_etiqueta(c, m_x, py, l_eti, a_eti, {**dados_base, 'vol_status': f"{i} / {qtd_volumes}"})
     c.save()
